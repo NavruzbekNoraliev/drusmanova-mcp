@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-drusmanova}
+      POSTGRES_USER: ${POSTGRES_USER:-drusmanova}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-drusmanova}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-drusmanova} -d ${POSTGRES_DB:-drusmanova}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  booking-api:
+    build: ./booking-api
+    restart: unless-stopped
+    ports:
+      - "8089:8089"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-drusmanova}:${POSTGRES_PASSWORD:-drusmanova}@postgres:5432/${POSTGRES_DB:-drusmanova}
+      GOOGLE_CREDENTIALS_JSON: ${GOOGLE_CREDENTIALS_JSON:-}
+      GOOGLE_CALENDAR_ID: ${GOOGLE_CALENDAR_ID:-primary}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  mcp-server:
+    build: ./mcp-server
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    environment:
+      BOOKING_API_URL: http://booking-api:8089
+    depends_on:
+      - booking-api
+
+volumes:
+  postgres_data:
